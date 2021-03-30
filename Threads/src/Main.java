@@ -3,7 +3,6 @@ public class Main {
         System.out.println(ColourConstants.ANSI_PURPLE + "Hello from Main Thread");
 
         Thread anotherThread = new AnotherThread();
-
         anotherThread.start();
 
         Thread runnable = new Thread(new RunnableThread());
@@ -14,7 +13,12 @@ public class Main {
         new Thread(new Runnable() {
             @Override
             public void run() {
-                System.out.println(ColourConstants.ANSI_BLACK + "Hello World from Anonymous Runnable! ");
+                try {
+                    runnable.join(2000); // Means only waits for 2 seconds
+                    System.out.println(ColourConstants.ANSI_RESET + "Hello World from Anonymous Runnable!, after runnable ended! , or after 2 seconds!");
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
             }
         }).start();
 
