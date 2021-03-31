@@ -14,6 +14,7 @@ public class MultipleThreads {
 
 class Counter {
     private int i;
+    // public synchronized void count() { we can synchronize the entire method, won't stop in between the method execution.
     public void count() {
         String colour;
         switch (Thread.currentThread().getName()) {
@@ -26,8 +27,11 @@ class Counter {
             default:
                 colour = ColourConstants.ANSI_BLUE;
         }
-        for (i = 0; i < 10; i++) {
-            System.out.println(colour + "i : " + i);
+        synchronized (this) { // synchronized block first acquires a lock for the given variable, only one thread can have a lock at a time,
+            // so only one thread runs it at a time, this refers to the object, as the same object are being used, this works.
+            for (i = 0; i < 10; i++) {
+                System.out.println(colour + "i : " + i);
+            }
         }
     }
 }
