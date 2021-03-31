@@ -1,8 +1,11 @@
-package producerConsumer;
+package Executor;
+
+import producerConsumer.ColourConstants;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
+import java.util.concurrent.*;
 import java.util.concurrent.locks.ReentrantLock;
 
 import static producerConsumer.ProducerConsumer.EOF;
@@ -11,7 +14,7 @@ import static producerConsumer.ProducerConsumer.EOF;
 public class ProducerConsumer {
     public static final String EOF = "EOF";
 
-    public static void main(String[] args) {
+    public static void main(String[] args) throws InterruptedException, ExecutionException {
 
         List<String> buffer = new ArrayList<>();
         ReentrantLock bufferLock = new ReentrantLock();
@@ -21,9 +24,31 @@ public class ProducerConsumer {
         MyConsumerLocks consumer2 = new MyConsumerLocks(buffer, ColourConstants.ANSI_RED, bufferLock);
 
 
-        new Thread(producer).start();
-        new Thread(consumer1).start();
-        new Thread(consumer2).start();
+        ExecutorService executor = Executors.newFixedThreadPool(3);
+
+        executor.execute(producer);
+        executor.execute(consumer1);
+        executor.execute(consumer2);
+
+        //Futures are used to get an output from a thread. We can use the executor.submit() to
+        // run a callable object, which is similar to a runnable object. So whatever the call method
+        // returns that is stored into the FutureObject. We can access the returned value using future.get()
+        Future<String> future = executor.submit(new Callable<String>() {
+            @Override
+            public String call() throws Exception {
+                System.out.println(ColourConstants.ANSI_PURPLE + "I'm being printed inside the call method");
+                return "Callable Result";
+            }
+        });
+
+        System.out.println(ColourConstants.ANSI_RESET + "Future's result: " + future.get());
+
+        executor.shutdown(); //Both the methods don't accept and new threads after shutdown, means after calling shutdown, we can't call execute.
+        // shutdownNow triggers the interrupt and tries terminating the process, shutdown doesn't. However, if interruption are not implemented, then they both
+        // perform the same way.
+
+//        executor.shutdownNow();
+
     }
 }
 
@@ -54,7 +79,7 @@ class MyProducerLocks implements Runnable {
             try {
                 Thread.sleep(random.nextInt(1000));
             } catch (InterruptedException e) {
-
+                System.out.println(colour+"Tried Interrupting!");
             }
         }
         System.out.println(colour + "Adding EOF: " + EOF);
@@ -87,7 +112,7 @@ class MyConsumerLocks implements Runnable {
                     if (buffer.isEmpty()) {
                         continue;
                     }
-                    System.out.println(colour + "Counter: " + count);
+//                    System.out.println(colour + "Counter: " + count);
                     count = 0;
                     if (buffer.get(0).equalsIgnoreCase(EOF)) {
                         System.out.println(colour + "Exiting from consumer");
