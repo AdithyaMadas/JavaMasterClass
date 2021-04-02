@@ -1,5 +1,6 @@
 package Executor;
 
+
 import producerConsumer.ColourConstants;
 
 import java.util.ArrayList;
@@ -10,18 +11,18 @@ import java.util.concurrent.locks.ReentrantLock;
 
 import static producerConsumer.ProducerConsumer.EOF;
 
-//try running code without synchronized blocks, to see why we need them
-public class ProducerConsumer {
+//ArrayBlockingQueue is a Thread safe queue, like any queue it is FIFO, only one Thread can put or take elements from the queue when executing,
+// queue doesn't stop processing in the middle
+public class ProducerConsumerWithArrayBlockingQueue {
     public static final String EOF = "EOF";
 
     public static void main(String[] args) throws InterruptedException, ExecutionException {
 
-        List<String> buffer = new ArrayList<>();
-        ReentrantLock bufferLock = new ReentrantLock();
+        ArrayBlockingQueue<String> buffer = new ArrayBlockingQueue<>(6);
 
-        MyProducerLocks producer = new MyProducerLocks(buffer, ColourConstants.ANSI_GREEN, bufferLock);
-        MyConsumerLocks consumer1 = new MyConsumerLocks(buffer, ColourConstants.ANSI_BLUE, bufferLock);
-        MyConsumerLocks consumer2 = new MyConsumerLocks(buffer, ColourConstants.ANSI_RED, bufferLock);
+        MyProducerLocksWithArrayBlockingQueue producer = new MyProducerLocksWithArrayBlockingQueue(buffer, ColourConstants.ANSI_GREEN);
+        MyConsumerLocksWithArrayBlockingQueue consumer1 = new MyConsumerLocksWithArrayBlockingQueue(buffer, ColourConstants.ANSI_BLUE);
+        MyConsumerLocksWithArrayBlockingQueue consumer2 = new MyConsumerLocksWithArrayBlockingQueue(buffer, ColourConstants.ANSI_RED);
 
 
         ExecutorService executor = Executors.newFixedThreadPool(5);
@@ -52,15 +53,13 @@ public class ProducerConsumer {
     }
 }
 
-class MyProducerLocks implements Runnable {
-    List<String> buffer;
+class MyProducerLocksWithArrayBlockingQueue implements Runnable {
+    ArrayBlockingQueue<String> buffer;
     String colour;
-    ReentrantLock lock;
 
-    public MyProducerLocks(List<String> buffer, String colour, ReentrantLock lock) {
+    public MyProducerLocksWithArrayBlockingQueue(ArrayBlockingQueue<String> buffer, String colour) {
         this.buffer = buffer;
         this.colour = colour;
-        this.lock = lock;
     }
 
     @Override
@@ -69,63 +68,55 @@ class MyProducerLocks implements Runnable {
         String[] nums = {"1", "2", "3", "4", "5"};
         for (String num : nums) {
             System.out.println(colour + "Adding: " + num);
-            lock.lock();
             try {
-                buffer.add(num);
-            }finally {
-                lock.unlock();
+                buffer.put(num);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
             }
 
             try {
                 Thread.sleep(random.nextInt(1000));
             } catch (InterruptedException e) {
-                System.out.println(colour+"Tried Interrupting!");
+                System.out.println(colour + "Tried Interrupting!");
             }
         }
         System.out.println(colour + "Adding EOF: " + EOF);
-        lock.lock();
         try {
-            buffer.add(EOF);
-        }finally {
-            lock.unlock();
+            buffer.put(EOF);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
         }
     }
 }
 
-class MyConsumerLocks implements Runnable {
-    List<String> buffer;
+class MyConsumerLocksWithArrayBlockingQueue implements Runnable {
+    ArrayBlockingQueue<String> buffer;
     String colour;
-    ReentrantLock lock;
 
-    public MyConsumerLocks(List<String> buffer, String colour, ReentrantLock lock) {
+    public MyConsumerLocksWithArrayBlockingQueue(ArrayBlockingQueue<String> buffer, String colour) {
         this.buffer = buffer;
         this.colour = colour;
-        this.lock = lock;
     }
 
     @Override
     public void run() {
-        int count = 0;
         while (true) {
-            if (lock.tryLock()) {
-                try {
-                    if (buffer.isEmpty()) {
-                        continue;
-                    }
-//                    System.out.println(colour + "Counter: " + count);
-                    count = 0;
-                    if (buffer.get(0).equalsIgnoreCase(EOF)) {
-                        System.out.println(colour + "Exiting from consumer");
-                        break;
-                    } else {
-                        System.out.println(colour + "Read in Consumer: " + buffer.remove(0));
-                    }
-                } finally {
-                    lock.unlock();
+            synchronized (buffer) {
+                if (buffer.isEmpty()) {
+                    continue;
                 }
-            } else {
-                count++;
+                if (buffer.peek().equalsIgnoreCase(EOF)) {
+                    System.out.println(colour + "Exiting from consumer");
+                    break;
+                } else {
+                    try {
+                        System.out.println(colour + "Read in Consumer: " + buffer.take());
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                }
             }
         }
     }
 }
+
